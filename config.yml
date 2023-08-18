@@ -1,0 +1,4 @@
+base_url: https://utbd.openai.azure.com/
+api_key: ec4eddd112ca4626b79c4ed61310326b
+api_version: 2023-03-15-preview
+deployment_name: gpt4_small
