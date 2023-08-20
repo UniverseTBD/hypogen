@@ -7,6 +7,7 @@ from langchain.chat_models import AzureChatOpenAI
 from langchain.output_parsers import PydanticOutputParser
 from langchain.schema import HumanMessage
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from tqdm import tqdm
 from typing import Dict
 from utils import *
 import os
@@ -107,10 +108,22 @@ def extract_hypothesis(abstract):
     return extract_to_hypothesis(response)
 
 if __name__ == "__main__":
-    if not os.path.exists('arxiv.csv'): df = load_arxiv_json()
-    else: df = pd.read_csv('arxiv.csv')
+    if not os.path.exists('arxiv.csv'):  df = load_arxiv_json()
+    else:  df = pd.read_csv('arxiv.csv')
+    
     abstracts = df['abstract'].values
-    abstracts[-1]
-    abstract = abstracts[-1]
-    result = extract_hypothesis(abstract)
-    print(result)
+    
+    # List to store the extracted hypotheses
+    extracted_hypotheses = []
+
+    # Process each abstract
+    for abstract in tqdm(abstracts, desc="Extracting Hypotheses"):
+        try:
+            hypothesis = extract_hypothesis(abstract)
+            extracted_hypotheses.append(hypothesis.dict())
+        except Exception as e:
+            print(f"Error processing abstract: {abstract[:100]}... Error: {e}")
+
+    # Save the extracted hypotheses to a JSON file
+    with open("extracted.json", "w") as f:
+        json.dump(extracted_hypotheses, f, indent=4)
