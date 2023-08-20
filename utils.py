@@ -1,6 +1,6 @@
 import json
 import pandas as pd
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 
 TOTAL_PAPERS = 2307752
 
