@@ -1,29 +1,215 @@
-import argparse
-import bitsandbytes as bnb
-from datasets import load_dataset
-from functools import partial
-import os
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, AutoPeftModelForCausalLM
+from dataclasses import dataclass, field
+from typing import Optional
+
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed, Trainer, TrainingArguments, BitsAndBytesConfig, \
-    DataCollatorForLanguageModeling, Trainer, TrainingArguments
 from datasets import load_dataset
+from peft import LoraConfig
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+    HfArgumentParser,
+    AutoTokenizer,
+    TrainingArguments,
+)
+from peft.tuners.lora import LoraLayer
+from trl import SFTTrainer
 
-model_name = "g/data/y89/cn1951/llama-13b"
+# from huggingface_hub import login
+# login("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")
 
-def load_model(model_name, bnb_config):
-    n_gpus = torch.cuda.device_count()
-    max_memory = f'{40960}MB'
+import os
+os.environ["WANDB_MODE"]="offline"
+
+
+# Define and parse arguments.
+
+
+@dataclass
+class ScriptArguments:
+    """
+    These arguments vary depending on how many GPUs you have, what their capacity and features are, and what size model you want to train.
+    """
+
+    local_rank: Optional[int] = field(default=-1, metadata={"help": "Used for multi-gpu"})
+
+    per_device_train_batch_size: Optional[int] = field(default=4)
+    per_device_eval_batch_size: Optional[int] = field(default=1)
+    gradient_accumulation_steps: Optional[int] = field(default=4)
+    learning_rate: Optional[float] = field(default=2e-4)
+    max_grad_norm: Optional[float] = field(default=0.3)
+    weight_decay: Optional[int] = field(default=0.001)
+    lora_alpha: Optional[int] = field(default=16)
+    lora_dropout: Optional[float] = field(default=0.1)
+    lora_r: Optional[int] = field(default=64)
+    max_seq_length: Optional[int] = field(default=512)
+    model_name: Optional[str] = field(
+        default="/g/data/y89/cn1951/falcon-40b",
+        metadata={
+            "help": "The model that you want to train from the Hugging Face hub. E.g. gpt2, gpt2-xl, bert, etc."
+        },
+    )
+    dataset_name: Optional[str] = field(
+        default="extracted.json",
+        metadata={"help": "The preference dataset to use."},
+    )
+    use_4bit: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Activate 4bit precision base model loading"},
+    )
+    use_nested_quant: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Activate nested quantization for 4bit base models"},
+    )
+    bnb_4bit_compute_dtype: Optional[str] = field(
+        default="float16",
+        metadata={"help": "Compute dtype for 4bit base models"},
+    )
+    bnb_4bit_quant_type: Optional[str] = field(
+        default="nf4",
+        metadata={"help": "Quantization type fp4 or nf4"},
+    )
+    num_train_epochs: Optional[int] = field(
+        default=1,
+        metadata={"help": "The number of training epochs for the reward model."},
+    )
+    fp16: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enables fp16 training."},
+    )
+    bf16: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enables bf16 training."},
+    )
+    packing: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Use packing dataset creating."},
+    )
+    gradient_checkpointing: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Enables gradient checkpointing."},
+    )
+    optim: Optional[str] = field(
+        default="paged_adamw_32bit",
+        metadata={"help": "The optimizer to use."},
+    )
+    lr_scheduler_type: str = field(
+        default="constant",
+        metadata={"help": "Learning rate schedule. Constant a bit better than cosine, and has advantage for analysis"},
+    )
+    max_steps: int = field(default=2000, metadata={"help": "How many optimizer update steps to take"})
+    warmup_ratio: float = field(default=0.03, metadata={"help": "Fraction of steps to do a warmup for"})
+    group_by_length: bool = field(
+        default=True,
+        metadata={
+            "help": "Group sequences into batches with same length. Saves memory and speeds up training considerably."
+        },
+    )
+    save_steps: int = field(default=1000, metadata={"help": "Save checkpoint every X updates steps."})
+    logging_steps: int = field(default=10, metadata={"help": "Log every X updates steps."})
+
+
+parser = HfArgumentParser(ScriptArguments)
+script_args = parser.parse_args_into_dataclasses()[0]
+
+
+def create_and_prepare_model(args):
+    compute_dtype = getattr(torch, args.bnb_4bit_compute_dtype)
+
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=args.use_4bit,
+        bnb_4bit_quant_type=args.bnb_4bit_quant_type,
+        bnb_4bit_compute_dtype=compute_dtype,
+        bnb_4bit_use_double_quant=args.use_nested_quant,
+    )
+
+    if compute_dtype == torch.float16 and args.use_4bit:
+        major, _ = torch.cuda.get_device_capability()
+        if major >= 8:
+            print("=" * 80)
+            print("Your GPU supports bfloat16, you can accelerate training with the argument --bf16")
+            print("=" * 80)
+
+    device_map = {"": 0}
 
     model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        quantization_config=bnb_config,
-        device_map="auto", # dispatch efficiently the model on the available ressources
-        max_memory = {i: max_memory for i in range(n_gpus)},
+        script_args.model_name, quantization_config=bnb_config, device_map="auto", trust_remote_code=True
     )
-    tokenizer = AutoTokenizer.from_pretrained(model_name, use_auth_token=True)
 
-    # Needed for LLaMA tokenizer
+    peft_config = LoraConfig(
+        lora_alpha=script_args.lora_alpha,
+        lora_dropout=script_args.lora_dropout,
+        r=script_args.lora_r,
+        bias="none",
+        task_type="CAUSAL_LM",
+        target_modules=[
+            "query_key_value",
+            "dense",
+            "dense_h_to_4h",
+            "dense_4h_to_h",
+        ],  # , "word_embeddings", "lm_head"],
+    )
+
+    tokenizer = AutoTokenizer.from_pretrained(script_args.model_name, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.eos_token
 
-    return model, tokenizer
+    return model, peft_config, tokenizer
+
+
+training_arguments = TrainingArguments(
+    output_dir="../models/commonsense",
+    # push_to_hub=False,
+    per_device_train_batch_size=script_args.per_device_train_batch_size,
+    gradient_accumulation_steps=script_args.gradient_accumulation_steps,
+    optim=script_args.optim,
+    save_steps=script_args.save_steps,
+    logging_steps=script_args.logging_steps,
+    learning_rate=script_args.learning_rate,
+    fp16=script_args.fp16,
+    bf16=script_args.bf16,
+    max_grad_norm=script_args.max_grad_norm,
+    max_steps=script_args.max_steps,
+    warmup_ratio=script_args.warmup_ratio,
+    group_by_length=script_args.group_by_length,
+    lr_scheduler_type=script_args.lr_scheduler_type,
+)
+
+model, peft_config, tokenizer = create_and_prepare_model(script_args)
+model.config.use_cache = False
+
+# Load the abstracts dataset by default
+dataset = load_dataset("json", data_files=script_args.dataset_name, split="train")
+
+def formatting_prompts_func(examples):
+    output_texts = []
+    for i in range(len(examples)):
+        text = f"### Instruction: Generate a hypothesis about the following problem: {examples['Problem'][i]}\n \
+                 ### Hypothesis\n: {examples['Problem'][i]}\n {examples['Solution'][i]}\n {examples['Methodology'][i]}\n {examples['Evaluation'][i]}\n {examples['Results'][i]}"
+        output_texts.append(text)
+    return output_texts
+
+trainer = SFTTrainer(
+    model=model,
+    train_dataset=dataset,
+    peft_config=peft_config,
+    dataset_text_field="text",
+    max_seq_length=script_args.max_seq_length,
+    #formatting_func=formatting_prompts_func,
+    tokenizer=tokenizer,
+    args=training_arguments,
+    packing=script_args.packing,
+)
+
+
+for name, module in trainer.model.named_modules():
+    if isinstance(module, LoraLayer):
+        if script_args.bf16:
+            module = module.to(torch.bfloat16)
+    if "norm" in name:
+        module = module.to(torch.float32)
+    if "lm_head" in name or "embed_tokens" in name:
+        if hasattr(module, "weight"):
+            if script_args.bf16 and module.weight.dtype == torch.float32:
+                module = module.to(torch.bfloat16)
+
+trainer.train()
