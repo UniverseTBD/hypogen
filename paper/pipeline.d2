@@ -1,0 +1,107 @@
+ArXiv Papers: {
+    shape: image
+    icon: https://icons.terrastruct.com/essentials%2F304-archive.svg
+    width: 200
+    height: 200
+  }
+  
+  Hypotheses: {
+    shape: sql_table
+    # This is defined using the shorthand syntax for labels discussed in the containers section.
+    # But here it's for the type of a constraint.
+    Problem: Issues or challenges addressed
+    Solution: Proposed solutions or methods
+    Evaluation: How results or solutions are assessed
+    width: 200
+    height: 200
+  }
+  
+  Generator: {
+    shape: image
+    icon: https://icons.terrastruct.com/infra%2F021-hardware.svg
+    width: 200
+    height: 200
+  }
+  
+  Vector Database: {
+    shape: image
+    icon: https://icons.terrastruct.com/infra%2F010-data-sharing.svg
+    width: 200
+    height: 200
+  }
+  
+  Question: {
+    shape: image
+    icon: https://icons.terrastruct.com/essentials%2F061-info.svg
+    width: 200
+    height: 200
+  }
+  
+  Proposals: {
+    shape: image
+    icon: https://icons.terrastruct.com/essentials%2F263-notepad.svg
+    width: 200
+    height: 200
+  }
+  
+  Redundancy Check: {
+    shape: image
+    icon: https://icons.terrastruct.com/essentials%2F075-equal.svg
+    width: 200
+    height: 200
+  }
+  
+  Reviewer: {
+    shape: image
+    icon: https://icons.terrastruct.com/essentials%2F021-view.svg
+    width: 200
+    height: 200
+  }
+  
+  Adversarial Critique: {
+    shape: image
+    icon: https://icons.terrastruct.com/essentials%2F170-flag.svg
+    width: 200
+    height: 200
+  }
+  
+  # Arrows
+  direction: right
+  ArXiv Papers -> Hypotheses: GPT-4 {
+    style: {
+      font-size: 48
+    }
+  }
+  ArXiv Papers -> Vector Database: Embedding {
+    style: {
+      font-size: 48
+    }
+  }
+  Hypotheses -> Generator: Fine-tuning {
+    style: {
+      font-size: 48
+    }
+  }
+  Vector Database -> Proposals
+  Generator -> Proposals
+  Question -> Proposals
+  Proposals -> Reviewer
+  Reviewer -> Adversarial Critique
+  
+  Redundancy Check -> Reviewer
+  Vector Database -> Redundancy Check: Similarity search {
+    style: {
+      font-size: 48
+    }
+  }
+  Proposals -> Redundancy Check
+  
+  ArXiv Papers.style.font-size: 58
+  Hypotheses.style.font-size: 48
+  Vector Database.style.font-size: 58
+  Generator.style.font-size: 58
+  Proposals.style.font-size: 58
+  Reviewer.style.font-size: 58
+  Question.style.font-size: 58
+  Redundancy Check.style.font-size: 58
+  Adversarial Critique.style.font-size: 58

@@ -27,10 +27,9 @@ Next, organise the main concepts into a JSON-style dictionary object with the ex
     'Solution': 'Proposed solutions or methods.',
     'Methodology': 'Implementation details of the solutions or methods.',
     'Evaluation': 'How results or solutions are assessed.',
-    'Results': 'Conclusions drawn from the study.'
 }}
 
-Your goal is to capture the essence of the abstract in a clear and structured manner, highlighting the most critical elements using the provided categories 'Problem', 'Solution', 'Methodology', 'Evaluation' and 'Results'.
+Your goal is to capture the essence of the abstract in a clear and structured manner, highlighting the most critical elements using the provided categories 'Problem', 'Solution', 'Methodology', and 'Evaluation'.
 """
 
 class HypothesisExtractionPromptTemplate(StringPromptTemplate, BaseModel):
@@ -57,7 +56,6 @@ class Hypothesis(BaseModel):
     Solution: str = Field(description="Proposed solutions or methods.")
     Methodology: str = Field(description="Implementation details of the solutions or methods.")
     Evaluation: str = Field(description="How results or solutions are assessed.")
-    Results: str = Field(description="Conclusions drawn from the study.")
 
 config = yaml.safe_load(open("../config.yml"))
 API_KEY = config['api_key']

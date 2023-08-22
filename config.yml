@@ -1,4 +1,6 @@
 base_url: https://utbd.openai.azure.com/
+embedding_base_url: https://astrofm-azure-oai.openai.azure.com/
 api_key: ec4eddd112ca4626b79c4ed61310326b
 api_version: 2023-03-15-preview
+embedding_api_key: b80bb7eacee14b1c8eeb442dbda32863
 deployment_name: gpt4_small
