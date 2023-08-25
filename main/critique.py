@@ -29,12 +29,12 @@ critic_template = """
 Given the following hypothesis:
 {hypothesis}
 
-Analyze each part of the hypothesis:
+Analyse each part of the hypothesis:
 1. Clarity: Are the statements clear and easy to understand?
 2. Coherence: Do the different parts of the hypothesis logically flow together? Does it seem like the proposed solution would work?
 3. Scientific Validity: Are there any scientific inaccuracies or assumptions that seem unfounded?
 
-After your analysis, provide specific feedback on how each field (Problem, Solution, Methodology, Evaluation, Results) can be improved.
+After your analysis, provide specific feedback on how each field (Problem, Solution, Methodology, Evaluation) can be improved.
 Specifically, give feedback on the frailties of the idea as a whole, and suggest potential enhancements.
 """
 
@@ -77,7 +77,6 @@ hypothesis_to_improve = {
     "Solution": "Using observational data to estimate the color correction factor by modeling the disk spectrum with saturated Compton scattering.",
     "Methodology": "The work is based on two observations made by XMM-Newton on GX 339-4. These observations offer high-quality data at low energies. The spectra were then fitted to these models.",
     "Evaluation": "The quality of fit of the spectra to the models was examined. Other models were also tested for fit.",
-    "Results": "The spectra fits well with the model and provides reasonable values for the color correction factor. However, the high-soft-state continuum cannot be adequately fitted by the latest disk models."
 }
 
 hypothesis = improve_hypothesis(hypothesis=hypothesis_to_improve, n_iters=3)

@@ -1,8 +1,10 @@
 import os
 import yaml
-from langchain.document_loaders import JSONLoader
+import json
+from pathlib import Path
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.vectorstores import Chroma
+from langchain.docstore.document import Document
 
 # Load configuration and set API key
 config = yaml.safe_load(open("../config.yml"))
@@ -20,21 +22,11 @@ embeddings = OpenAIEmbeddings(
     openai_api_type="azure",
 )
 
-# Use JSONLoader to load each article from the JSON file
-# We're using the jq_schema '.' to get each dictionary in the JSON array
-loader = JSONLoader(
-    file_path='../data/processed/extracted_preprocessed.json',
-    jq_schema='.text'
-)
-
-documents = loader.load()
+# Load the JSON file and extract the 'text' attribute for each dictionary
+file_path = '../data/processed/extracted_preprocessed.json'
+json_data = json.loads(Path(file_path).read_text())
+documents = [Document(page_content=entry['text'], metadata={"source": "local"}) for entry in json_data]
 print(documents)
-
-documents = loader.load()
-print(documents)
-
-# Each document will be a combination of the "Problem", "Solution", "Methodology", "Evaluation", and "Results" fields
-documents = [doc['Problem'] + " " + doc['Solution'] + " " + doc['Methodology'] + " " + doc['Evaluation'] + " " + doc['Results'] for doc in documents]
 
 # Define the persistence directory for Chroma
 persist_directory = "chroma_db"
