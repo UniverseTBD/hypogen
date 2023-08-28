@@ -23,13 +23,11 @@ Break them down into simpler, more digestible statements, but keep the key detai
 Next, organise the main concepts into a JSON-style dictionary object with the exact following structure:
 
 {{
-    'Problem': 'Issues or challenges addressed.',
-    'Solution': 'Proposed solutions or methods.',
-    'Methodology': 'Implementation details of the solutions or methods.',
-    'Evaluation': 'How results or solutions are assessed.',
+    'Problem': 'Summarize the main problem or research question the paper is trying to address in a single, concise sentence. Frame this as a general question in science, not in the context of the paper i.e. "LSTMs and RNNs in general cannot be parallelised and thus are slow" vs "This paper aims to address the lack of parallelisability of RNNs".',
+    'Solution': 'High-level proposed solutions or methods.',
 }}
 
-Your goal is to capture the essence of the abstract in a clear and structured manner, highlighting the most critical elements using the provided categories 'Problem', 'Solution', 'Methodology', and 'Evaluation'.
+Your goal is to capture the essence of the abstract in a clear and structured manner, highlighting the most critical elements using the provided categories 'Problem' and 'Solution'.
 """
 
 class HypothesisExtractionPromptTemplate(StringPromptTemplate, BaseModel):
@@ -53,9 +51,7 @@ class HypothesisExtractionPromptTemplate(StringPromptTemplate, BaseModel):
 # Redefining the Pydantic model for Hypothesis
 class Hypothesis(BaseModel):
     Problem: str = Field(description="Issues or challenges addressed.")
-    Solution: str = Field(description="Proposed solutions or methods.")
-    Methodology: str = Field(description="Implementation details of the solutions or methods.")
-    Evaluation: str = Field(description="How results or solutions are assessed.")
+    Solution: str = Field(description="High-level proposed solutions or methods.")
 
 config = yaml.safe_load(open("../config.yml"))
 API_KEY = config['api_key']
@@ -123,9 +119,19 @@ def worker(abstract):
         return None
 
 if __name__ == "__main__":
-    df = pd.read_csv('arxiv.csv', low_memory=False)
+
+    # The raw ArXiv dataset is stored in data/raw/arxiv.csv
+    df = pd.read_csv('../data/raw/arxiv.csv', low_memory=False)
+
+    # Train-test split: 90-10
+    # The total dataset size will be 10,000
+    df = df.sample(frac=1, random_state=42).reset_index(drop=True)
+    num_abstracts = 10000
+    df = df.iloc[:num_abstracts]
     
-    abstracts = df['abstract'].values[:100]
+    # Extract the abstracts
+    abstracts = df['abstract'].values
+    print(len(abstracts))
     
     # List to store the extracted hypotheses
     extracted_hypotheses = []
@@ -137,6 +143,11 @@ if __name__ == "__main__":
             if result:
                 extracted_hypotheses.append(result)
 
-    # Save the extracted hypotheses to a JSON file
-    with open("extracted_large.json", "w") as f:
-        json.dump(extracted_hypotheses, f, indent=4)
+    # Save the extracted hypotheses to a CSV file
+    df = pd.DataFrame(extracted_hypotheses)
+    # Train-test split: 90-10
+    df_train = df.iloc[int(0.1*len(df)):]
+    df_test = df.iloc[:int(0.1*len(df))]
+    # Save dataframe to CSV
+    df_train.to_csv('../data/processed/train.csv', index=False)
+    df_test.to_csv('../data/processed/test.csv', index=False)
