@@ -120,18 +120,25 @@ def worker(abstract):
 
 if __name__ == "__main__":
 
+    yuan = True
+
     # The raw ArXiv dataset is stored in data/raw/arxiv.csv
-    df = pd.read_csv('../data/raw/arxiv.csv', low_memory=False)
+    if yuan: 
+        df = pd.read_csv('../data/raw/yuan.csv', low_memory=False)
+        df.rename(columns={'Abstract': 'abstract'}, inplace=True)
+        num_abstracts = len(df)
+    else: 
+        df = pd.read_csv('../data/raw/arxiv.csv', low_memory=False)
+        num_abstracts = 10000
 
     # Train-test split: 90-10
     # The total dataset size will be 10,000
     df = df.sample(frac=1, random_state=42).reset_index(drop=True)
-    num_abstracts = 10000
     df = df.iloc[:num_abstracts]
     
     # Extract the abstracts
     abstracts = df['abstract'].values
-    print(len(abstracts))
+    print(f"Extracting hypotheses from {len(abstracts)} abstracts..."
     
     # List to store the extracted hypotheses
     extracted_hypotheses = []
@@ -149,5 +156,9 @@ if __name__ == "__main__":
     df_train = df.iloc[int(0.1*len(df)):]
     df_test = df.iloc[:int(0.1*len(df))]
     # Save dataframe to CSV
-    df_train.to_csv('../data/processed/train.csv', index=False)
-    df_test.to_csv('../data/processed/test.csv', index=False)
+    if yuan:
+        df_train.to_csv('../data/processed/yuan_train.csv', index=False)
+        df_test.to_csv('../data/processed/yuan_test.csv', index=False)
+    else:
+        df_train.to_csv('../data/processed/train.csv', index=False)
+        df_test.to_csv('../data/processed/test.csv', index=False)
