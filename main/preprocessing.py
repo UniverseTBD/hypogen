@@ -133,48 +133,60 @@ def worker(abstract_index_tuple):
         print(f"Error processing abstract: {abstract[:100]}... Error: {e}")
         return index, None
 
-if __name__ == "__main__":
+def main(n):
+    # Set variables
+    yuan = False
+    category = 'cs.LG'
 
-    yuan = True
+    # Read the last processed index from the existing CSV
+    file_path = f'../data/tuning/{category}.csv' if not yuan else '../data/tuning/yuan.csv'
+    if os.path.exists(file_path):
+        df_existing = pd.read_csv(file_path)
+        start_index = df_existing['index'].max() + 1  # Start from the next index
+    else:
+        start_index = 0  # Start from the beginning if the file doesn't exist
 
     # Load the data
     if yuan: 
-        df = pd.read_csv('../data/raw/yuan.csv', low_memory=False).iloc[:3]
+        df = pd.read_csv('../data/processed/yuan.csv', low_memory=False).iloc[start_index:start_index+n]
     else: 
-        df = pd.read_csv('../data/raw/arxiv.csv', low_memory=False)
+        df = pd.read_csv(f'../data/processed/arxiv-{category}.csv', low_memory=False).iloc[start_index:start_index+n]
 
-    # Shuffle and limit the number of abstracts
-    df = df.sample(frac=1, random_state=42).reset_index(drop=True)
+    df = df.reset_index(drop=True)
+    num_abstracts = len(df)
     
+    print(f"Extracting hypotheses from {num_abstracts} abstracts starting from index {start_index}...")
+
     abstracts = df['abstract'].values
-    print(f"Extracting hypotheses from {len(abstracts)} abstracts...")
-    
-    extracted_bits = [None] * len(abstracts)  # Initialize with None to preserve order
-    extracted_flips = [None] * len(abstracts)  # Initialize with None to preserve order
-    titles = [None] * len(abstracts)  # Initialize with None to preserve order
+    extracted_bits = [None] * num_abstracts
+    extracted_flips = [None] * num_abstracts
+    titles = [None] * num_abstracts
+    indices = [start_index + i for i in range(num_abstracts)]
 
     # Multithreaded processing
     with ThreadPoolExecutor(max_workers=5) as executor:
-        for index, result in tqdm(executor.map(worker, enumerate(abstracts)), total=len(abstracts), desc="Extracting Hypotheses"):
-            extracted_bits[index] = result['Bit']
-            extracted_flips[index] = result['Flip']
+        for index, result in tqdm(executor.map(worker, enumerate(abstracts)), total=num_abstracts, desc="Extracting Hypotheses"):
+            extracted_bits[index] = result['Bit'] if result else None
+            extracted_flips[index] = result['Flip'] if result else None
             titles[index] = df['title'].values[index]
 
-    # Create DataFrame from extracted hypotheses and titles
+    # Create DataFrame
     df_extracted = pd.DataFrame({
+        'index': indices,
         'bit': extracted_bits,
         'flip': extracted_flips,
         'title': titles
     }).dropna()
 
-    # Train-test split: 90-10
-    df_train = df_extracted.iloc[int(0.1*len(df_extracted)):]
-    df_test = df_extracted.iloc[:int(0.1*len(df_extracted))]
+    # Append to existing CSV or create a new one
+    if os.path.exists(file_path):
+        df_existing = pd.read_csv(file_path)
+        df_extracted = pd.concat([df_existing, df_extracted], ignore_index=True)
 
-    # Save dataframe to CSV
-    if yuan:
-        df_train.to_csv('../data/processed/yuan_train.csv', index=False)
-        df_test.to_csv('../data/processed/yuan_test.csv', index=False)
-    else:
-        df_train.to_csv('../data/processed/train.csv', index=False)
-        df_test.to_csv('../data/processed/test.csv', index=False)
+    df_extracted.to_csv(file_path, index=False)
+
+    print(f"Finished processing up to index {start_index + num_abstracts - 1}")
+
+if __name__ == "__main__":
+    n = 10  # Number of abstracts to process in each run
+    main(n)
