@@ -33,24 +33,23 @@ def load_arxiv_json_by_category(category='astro-ph', path='arxiv.json', total_pa
     df.to_csv('arxiv.csv', index=False)
     return df
 
-def preprocess_for_finetuning(path: str = 'extracted.json'):
-    # Read in the JSON file
-    with open(path, 'r') as f: examples = json.load(f)
+def preprocess_for_finetuning(path: str = '../data/processed/yuan_train.csv'):
+    # Read in the CSV
+    df = pd.read_csv(path)
+    problems = df['Problem'].values
+    solutions = df['Solution'].values
     # Create a list of texts
     output_texts = []
-    for i in range(len(examples)):
-        text = {'text': f"### Instruction: Generate a hypothesis about the following problem: {examples[i]['Problem']}\n \
-                 ### Hypothesis\n: Problem: {examples[i]['Problem']}\n \
-                 Solution: {examples[i]['Solution']}\n \
-                 Methodology: {examples[i]['Methodology']}\n \
-                 Evaluation: {examples[i]['Evaluation']}\n \
-                 Results: {examples[i]['Results']}"}
+    for i in range(len(df)):
+        text = {'text': f"### Instruction: Generate a proposed hypothesis about or solution to the following problem:\
+                 ### PROBLEM\n: Problem: {problems[i]}\n \
+                 SOLUTION: {solutions[i]}"}
         output_texts.append(text)
     # Wipe the current JSON file
-    with open('extracted_preprocessed.json', 'w') as f: json.dump([], f)
+    with open('train.json', 'w') as f: json.dump([], f)
     # Save the texts to a JSON file
-    with open('extracted_preprocessed.json', 'w') as f: json.dump(output_texts, f)
+    with open('train.json', 'w') as f: json.dump(output_texts, f)
 
 if __name__ == '__main__':
-    load_arxiv_json_by_category()
-    # preprocess_for_finetuning()
+    #load_arxiv_json_by_category()
+    preprocess_for_finetuning()

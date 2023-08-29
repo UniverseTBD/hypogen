@@ -8,26 +8,40 @@ from langchain.schema import HumanMessage
 from tqdm import tqdm
 from typing import Dict
 import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 from utils import *
 import os
 
-PROMPT = """\
-Please consider the following abstract:
+PROMPT = """
+Before you begin, let's understand the Bit-Flip concept using the example of BERT in NLP:
+
+Example:
+
+* Bit: NLP models read sentences word by word to understand the preceding context.
+* Flip: NLP models should read the entire sentence at once to understand both the preceding and succeeding context.
+
+Bit-Flip Defined:
+A Bit-Flip inverts a commonly held assumption, often questioning existing constraints, reapplying techniques to new domains, or adapting solutions for different scales. The 'Bit' is the prevailing belief, and the 'Flip' is the counterargument that challenges it.
+
+Guidance: When capturing the Bit and Flip, state them directly without referring to the specific research. Avoid phrases like "This paper aims to..." or "This research challenges...".
+
+Now, consider the following research abstract:
 
 {abstract}
 
-I'd like to extract a structured representation from it. To achieve this, do the following steps by thinking out loud, and thinking step by step:
+Your task is to articulate the abstract using a Bit-Flip schema:
 
-Begin by performing syntactic simplification of complex sentences in the abstract. 
-Break them down into simpler, more digestible statements, but keep the key details intact, particularly the context, field of study, and application of the problem.
-Next, organise the main concepts into a JSON-style dictionary object with the exact following structure:
+* Bit: Identify the conventional belief or 'status quo' the abstract implicitly or explicitly challenges.
+* Flip: Formulate the counterargument or innovative approach that flips the 'Bit'.
+
+Capture these insights in a JSON-style dictionary:
 
 {{
-    'Problem': 'Summarize the main problem or research question the paper is trying to address in a single, concise sentence. Frame this as a general question in science, not in the context of the paper i.e. "LSTMs and RNNs in general cannot be parallelised and thus are slow" vs "This paper aims to address the lack of parallelisability of RNNs".',
-    'Solution': 'High-level proposed solutions or methods.',
+'Bit': 'Conventional belief or assumption being challenged.',
+'Flip': 'Innovative counterargument or approach.'
 }}
 
-Your goal is to capture the essence of the abstract in a clear and structured manner, highlighting the most critical elements using the provided categories 'Problem' and 'Solution'.
+Your goal is to encapsulate the essence of the research abstract using only the Bit and Flip, while adhering to the Bit-Flip schema.
 """
 
 class HypothesisExtractionPromptTemplate(StringPromptTemplate, BaseModel):
@@ -50,8 +64,8 @@ class HypothesisExtractionPromptTemplate(StringPromptTemplate, BaseModel):
 
 # Redefining the Pydantic model for Hypothesis
 class Hypothesis(BaseModel):
-    Problem: str = Field(description="Issues or challenges addressed.")
-    Solution: str = Field(description="High-level proposed solutions or methods.")
+    Bit: str = Field(description="Conventional belief or approach that is being challenged.")
+    Flip: str = Field(description="The innovative perspective that sets this research apart.")
 
 config = yaml.safe_load(open("../config.yml"))
 API_KEY = config['api_key']
@@ -109,52 +123,54 @@ def extract_hypothesis(abstract):
     except Exception as e:
         print(f"Error extracting hypothesis from abstract with response: {response}... Error: {e}")
 
-def worker(abstract):
+def worker(abstract_index_tuple):
     """Function to be executed by each thread."""
+    index, abstract = abstract_index_tuple
     try:
         hypothesis = extract_hypothesis(abstract)
-        return hypothesis.dict()
+        return index, hypothesis.dict()
     except Exception as e:
         print(f"Error processing abstract: {abstract[:100]}... Error: {e}")
-        return None
+        return index, None
 
 if __name__ == "__main__":
 
     yuan = True
 
-    # The raw ArXiv dataset is stored in data/raw/arxiv.csv
+    # Load the data
     if yuan: 
-        df = pd.read_csv('../data/raw/yuan.csv', low_memory=False)
-        df.rename(columns={'Abstract': 'abstract'}, inplace=True)
-        num_abstracts = len(df)
+        df = pd.read_csv('../data/raw/yuan.csv', low_memory=False).iloc[:3]
     else: 
         df = pd.read_csv('../data/raw/arxiv.csv', low_memory=False)
-        num_abstracts = 10000
 
-    # Train-test split: 90-10
-    # The total dataset size will be 10,000
+    # Shuffle and limit the number of abstracts
     df = df.sample(frac=1, random_state=42).reset_index(drop=True)
-    df = df.iloc[:num_abstracts]
     
-    # Extract the abstracts
     abstracts = df['abstract'].values
-    print(f"Extracting hypotheses from {len(abstracts)} abstracts..."
+    print(f"Extracting hypotheses from {len(abstracts)} abstracts...")
     
-    # List to store the extracted hypotheses
-    extracted_hypotheses = []
+    extracted_bits = [None] * len(abstracts)  # Initialize with None to preserve order
+    extracted_flips = [None] * len(abstracts)  # Initialize with None to preserve order
+    titles = [None] * len(abstracts)  # Initialize with None to preserve order
 
-    # Use ThreadPoolExecutor to execute multiple abstracts concurrently
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor: # For example, using 5 threads
-        # Process each abstract
-        for result in tqdm(executor.map(worker, abstracts), total=len(abstracts), desc="Extracting Hypotheses"):
-            if result:
-                extracted_hypotheses.append(result)
+    # Multithreaded processing
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        for index, result in tqdm(executor.map(worker, enumerate(abstracts)), total=len(abstracts), desc="Extracting Hypotheses"):
+            extracted_bits[index] = result['Bit']
+            extracted_flips[index] = result['Flip']
+            titles[index] = df['title'].values[index]
 
-    # Save the extracted hypotheses to a CSV file
-    df = pd.DataFrame(extracted_hypotheses)
+    # Create DataFrame from extracted hypotheses and titles
+    df_extracted = pd.DataFrame({
+        'bit': extracted_bits,
+        'flip': extracted_flips,
+        'title': titles
+    }).dropna()
+
     # Train-test split: 90-10
-    df_train = df.iloc[int(0.1*len(df)):]
-    df_test = df.iloc[:int(0.1*len(df))]
+    df_train = df_extracted.iloc[int(0.1*len(df_extracted)):]
+    df_test = df_extracted.iloc[:int(0.1*len(df_extracted))]
+
     # Save dataframe to CSV
     if yuan:
         df_train.to_csv('../data/processed/yuan_train.csv', index=False)

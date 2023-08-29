@@ -43,8 +43,8 @@ embeddings = OpenAIEmbeddings(
 )
 
 # Load the JSON file and extract the 'text' attribute for each dictionary
-csv_file_path = '../data/processed/extracted_preprocessed.csv'
-loader = CSVLoader(file_path=csv_file_path, source_column="text")
+csv_file_path = '../data/processed/yuan_train.csv'
+loader = CSVLoader(file_path=csv_file_path)
 documents = loader.load()
 
 # Define the persistence directory for Chroma
@@ -59,7 +59,7 @@ vectordb = Chroma.from_documents(
 vectordb.persist()
 
 # Load from disk and query it
-query = "radial heating angular momentum"
+query = "special metallicity"
 db3 = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
 docs = db3.similarity_search(query)
-print(docs)
+print(docs[0])
