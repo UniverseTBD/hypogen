@@ -7,6 +7,7 @@ from langchain.output_parsers import PydanticOutputParser
 from langchain.schema import HumanMessage
 from tqdm import tqdm
 from typing import Dict
+import time
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
 from utils import *
@@ -128,9 +129,11 @@ def worker(abstract_index_tuple):
     index, abstract = abstract_index_tuple
     try:
         hypothesis = extract_hypothesis(abstract)
+        time.sleep(1)
         return index, hypothesis.dict()
     except Exception as e:
         print(f"Error processing abstract: {abstract[:100]}... Error: {e}")
+        time.sleep(1)
         return index, None
 
 def main(n):
@@ -188,5 +191,5 @@ def main(n):
     print(f"Finished processing up to index {start_index + num_abstracts - 1}")
 
 if __name__ == "__main__":
-    n = 10  # Number of abstracts to process in each run
+    n = 1000  # Number of abstracts to process in each run
     main(n)

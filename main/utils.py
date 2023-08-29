@@ -30,7 +30,7 @@ def load_arxiv_json_by_category(category='astro-ph', path='../data/raw/arxiv.jso
             except json.JSONDecodeError: continue
 
     df = pd.DataFrame(data)
-    columns = ['authors', 'title', 'doi', 'categories', 'abstract']
+    columns = ['authors', 'title', 'categories', 'abstract']
     df = df[columns]
     df.to_csv(f'../data/processed/arxiv-{category}.csv', index=False)
     return df
