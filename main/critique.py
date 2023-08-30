@@ -34,7 +34,7 @@ Analyse each part of the hypothesis:
 2. Coherence: Do the different parts of the hypothesis logically flow together? Does it seem like the proposed solution would work?
 3. Scientific Validity: Are there any scientific inaccuracies or assumptions that seem unfounded?
 
-After your analysis, provide specific feedback on how each field (Problem, Solution, Methodology, Evaluation) can be improved.
+After your analysis, provide specific feedback on how the flip can be improved, either conceptually (changing the idea) or microscopically (changing the implementation). 
 Specifically, give feedback on the frailties of the idea as a whole, and suggest potential enhancements.
 """
 
@@ -73,10 +73,8 @@ def improve_hypothesis(hypothesis: str, n_iters: int = 3) -> str:
     return hypothesis
 
 hypothesis_to_improve = {
-    "Problem": "Issues in determining basic characteristics of black holes and their surrounding disks in X-ray binary, using models of the source's disk X-ray continuum. A key issue is the determination of the \"color correction factor\".",
-    "Solution": "Using observational data to estimate the color correction factor by modeling the disk spectrum with saturated Compton scattering.",
-    "Methodology": "The work is based on two observations made by XMM-Newton on GX 339-4. These observations offer high-quality data at low energies. The spectra were then fitted to these models.",
-    "Evaluation": "The quality of fit of the spectra to the models was examined. Other models were also tested for fit.",
+    'Bit': 'Statistical model estimation in sensor networks requires advanced and costly joint optimization methods for distributed learning.',
+    'Flip': 'Simple linear combination or max-voting methods, when combined with second-order information, can be statistically competitive, offering low communication and computational cost and "any-time" behavior.'
 }
 
 hypothesis = improve_hypothesis(hypothesis=hypothesis_to_improve, n_iters=3)

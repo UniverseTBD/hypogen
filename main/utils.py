@@ -38,14 +38,14 @@ def load_arxiv_json_by_category(category='astro-ph', path='../data/raw/arxiv.jso
 def preprocess_for_finetuning(path: str = '../data/processed/yuan_train.csv'):
     # Read in the CSV
     df = pd.read_csv(path)
-    problems = df['Problem'].values
-    solutions = df['Solution'].values
+    bits = df['bit'].values
+    flips = df['flip'].values
     # Create a list of texts
     output_texts = []
     for i in range(len(df)):
-        text = {'text': f"### Instruction: Generate a proposed hypothesis about or solution to the following problem:\
-                 ### PROBLEM\n: Problem: {problems[i]}\n \
-                 SOLUTION: {solutions[i]}"}
+        text = {'text': f"### Instruction: Generate a proposed hypothesis in the bit-flip schema:\
+                 ### BIT\n: Problem: {bits[i]}\n \
+                 FLIP: {flips[i]}"}
         output_texts.append(text)
     # Wipe the current JSON file
     with open('train.json', 'w') as f: json.dump([], f)

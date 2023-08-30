@@ -32,16 +32,16 @@ loader = CSVLoader(file_path=csv_file_path,
 documents = loader.load()
 print(documents[0])
 
-# # Define the persistence directory for Chroma
-# persist_directory = "chroma_db"
+# Define the persistence directory for Chroma
+persist_directory = "chroma_db"
 
-# # Create the persistent Chroma DB instance
-# vectordb = Chroma.from_documents(
-#     documents=documents, embedding=embeddings, persist_directory=persist_directory
-# )
+# Create the persistent Chroma DB instance
+vectordb = Chroma.from_documents(
+    documents=documents, embedding=embeddings, persist_directory=persist_directory
+)
 
-# # Persist the embeddings
-# vectordb.persist()
+# Persist the embeddings
+vectordb.persist()
 
 # # Load from disk and query it
 # query = "special metallicity"
