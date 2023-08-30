@@ -1,50 +1,49 @@
-import os
+from concurrent.futures import ThreadPoolExecutor
+import pandas as pd
 import yaml
-import json
-from pathlib import Path
+import os
 from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.vectorstores import Chroma
-from langchain.docstore.document import Document
-from langchain.document_loaders.csv_loader import CSVLoader
+from langchain.vectorstores import FAISS
+from tqdm import tqdm
+
+def worker(text):
+    """Worker function to compute embeddings for a text."""
+    if text is None:
+        return None
+    embedded_text = embeddings.embed_query(text)
+    return (text, embedded_text)
 
 # Load configuration and set API key
 config = yaml.safe_load(open("../config.yml"))
 API_KEY = config['embedding_api_key']
 DEPLOYMENT_NAME = "embedding"
 BASE_URL = config['embedding_base_url']
-API_VERSION = config['api_version']
 os.environ['OPENAI_API_KEY'] = API_KEY
 
+# Initialize embeddings
 embeddings = OpenAIEmbeddings(
     openai_api_base=BASE_URL,
     deployment=DEPLOYMENT_NAME,
     model="text-embedding-ada-002",
     openai_api_key=API_KEY,
     openai_api_type="azure",
-    chunk_size=16,
+    chunk_size = 16,
 )
 
-# Load the JSON file and extract the 'text' attribute for each dictionary
-csv_file_path = '../data/processed/arxiv-cs.LG.csv'
-loader = CSVLoader(file_path=csv_file_path, 
-                   #csv_args={"fieldnames": ["title", "abstract"]})#,
-                   source_column="authors")
-documents = loader.load()
-print(documents[0])
+# Load CSV file directly
+df = pd.read_csv('../data/processed/arxiv-cs.LG.csv', low_memory=False)
 
-# Define the persistence directory for Chroma
-persist_directory = "chroma_db"
+# Create a list of strings by concatenating 'title' and 'abstract'
+documents = [f"{row['title']} {row['abstract']}" for index, row in df.head(3000).iterrows()]
 
-# Create the persistent Chroma DB instance
-vectordb = Chroma.from_documents(
-    documents=documents, embedding=embeddings, persist_directory=persist_directory
-)
+# Initialize an empty list to hold (text, embedding) tuples
+text_embeddings = []
 
-# Persist the embeddings
-vectordb.persist()
+# Use ThreadPoolExecutor with max_workers for threading
+with ThreadPoolExecutor(max_workers=5) as executor:
+    results = list(tqdm(executor.map(worker, documents), total=len(documents), desc="Computing Embeddings"))
+    text_embeddings.extend([(text, embedding) for text, embedding in results if text and embedding])
 
-# # Load from disk and query it
-# query = "special metallicity"
-# db3 = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
-# docs = db3.similarity_search(query)
-# # print(docs[0])
+# Create a FAISS Vectorstore and add the embeddings
+vectordb = FAISS.from_embeddings(text_embeddings, embedding=embeddings)
+vectordb.save_local("../data/vectorstore/arxiv-cs.LG")
