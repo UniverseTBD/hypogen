@@ -1,6 +1,7 @@
 import json
 import pandas as pd
 from tqdm import tqdm
+from datasets import load_dataset
 
 TOTAL_PAPERS = 2307752
 
@@ -52,6 +53,20 @@ def preprocess_for_finetuning(path: str = '../data/processed/yuan_train.csv'):
     # Save the texts to a JSON file
     with open('train.json', 'w') as f: json.dump(output_texts, f)
 
+def upload_dataset_to_hf(category: str):
+    df = pd.read_csv(f"../data/tuning/{category}.csv")
+    print(f"There are {len(df)} hypotheses in the dataset.")
+    abstracts = pd.read_csv(f"../data/processed/arxiv-{category}.csv", low_memory=False)
+    print(f"There are {len(abstracts)} abstracts in the dataset.")
+    # Merge the df and abstracts dataframes on title
+    merged_df = pd.merge(df, abstracts, on='title')
+    merged_df.drop(columns=['index'], inplace=True)
+    print(f"There are {len(merged_df)} hypotheses in the merged dataset.")
+    merged_df.to_csv(f"../data/processed/hf-{category}.csv", index=False)
+    # Load as HF dataset and push to hub
+    dataset = load_dataset('csv', data_files=f"../data/processed/hf-{category}.csv", split='train')
+    dataset.push_to_hub(f"universeTBD/arxiv-bit-flip-{category}")
+    print(f"Dataset uploaded to HF hub: universeTBD/arxiv-bit-flip-{category}")
+
 if __name__ == '__main__':
     load_arxiv_json_by_category(category='cs.LG')
-    #preprocess_for_finetuning()

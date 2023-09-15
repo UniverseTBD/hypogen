@@ -1,5 +1,6 @@
 data/raw/arxiv.json
 data/processed
 data/raw/arxiv.csv
+data
 config.yaml
 __pycache__

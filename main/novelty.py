@@ -53,7 +53,7 @@ def main(bit_flip):
     vectordb = FAISS.load_local("../data/vectorstore/arxiv-cs.LG", embeddings)
 
     prompt_template = """
-    You are a Neurips paper review determining the novelty of an idea. Use the following pieces of context to determine if the following idea.
+    You are a Neurips paper reviewer determining the novelty of an idea. Use the following pieces of context to determine if the following idea.
 
     Please perform a concise analysis to evaluate the novelty of this "flip" by:
 
