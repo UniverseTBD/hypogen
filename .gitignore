@@ -2,5 +2,6 @@ data/raw/arxiv.json
 data/processed
 data/raw/arxiv.csv
 data
+paper
 config.yaml
 __pycache__
