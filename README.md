@@ -16,3 +16,7 @@ The `tournament.py` script serves as a pre-evaluation mechanism to assess multip
 
 ### `critique.py`
 The `critique.py` script in the pipeline is responsible for refining the generated scientific hypotheses. It leverages two main functionalities—criticism and revision—facilitated by LLMChain objects wrapped in a SequentialChain. Upon receiving a hypothesis, the script first critically evaluates it for clarity, coherence, and scientific validity. It then uses this critique to revise the hypothesis iteratively for a predefined number of times.
+
+## Script guide
+
+To merge the fine-tuned model, you need to run the `utils.py` script from `/g/data/y89/cn1951/hypogen/` in `qsub` i.e. with the GPU.
