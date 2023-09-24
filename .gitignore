@@ -1,6 +1,7 @@
 data/raw/arxiv.json
 data/processed
 data/raw/arxiv.csv
+data/
 data
 paper
 config.yaml
