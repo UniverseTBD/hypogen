@@ -138,7 +138,7 @@ def worker(abstract_index_tuple):
 def main(n):
     # Set variables
     yuan = False
-    category = 'cs.LG'
+    category = 'astro-ph'
 
     # Read the last processed index from the existing CSV
     file_path = f'../data/tuning/{category}.csv' if not yuan else '../data/tuning/yuan.csv'
@@ -166,7 +166,7 @@ def main(n):
     indices = [start_index + i for i in range(num_abstracts)]
 
     # Multithreaded processing
-    with ThreadPoolExecutor(max_workers=6) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         for index, result in tqdm(executor.map(worker, enumerate(abstracts)), total=num_abstracts, desc="Extracting Hypotheses"):
             extracted_bits[index] = result['Bit'] if result else None
             extracted_flips[index] = result['Flip'] if result else None
@@ -188,19 +188,59 @@ def main(n):
     df_extracted.to_csv(file_path, index=False)
 
     print(f"Finished processing up to index {start_index + num_abstracts - 1}")
-    
-    # Iterate over rows of the extracted df and print bit then flip then space
-    # for index, row in df_extracted.iterrows():
-    #     print(f"Bit: {row['bit']}")
-    #     print(f"Flip: {row['flip']}")
-    #     print(f"Title: {row['title']}")
-    #     print()
 
 if __name__ == "__main__":
-    num_rounds = 100
-    num_abstracts = 25  # Number of abstracts to process in each run
+    num_rounds = 500
+    num_abstracts = 20  # Number of abstracts to process in each run
     for _ in tqdm(range(num_rounds), desc="Overall Progress"):
         main(num_abstracts)
         # Clear terminal
         os.system('cls' if os.name == 'nt' else 'clear')
         time.sleep(3)
+
+# def main():
+#     # Set variables
+#     category = 'cs.LG'
+#     num_abstracts = 1000  # Set the number of abstracts to process to 500
+#     file_path = f'../data/tuning/{category}.csv'
+
+#     # Load the data
+#     df = pd.read_csv(f'../data/processed/arxiv-{category}.csv', low_memory=False)
+
+#     # Update the starting index to point to the last 500 abstracts
+#     start_index = max(0, len(df) - num_abstracts)
+#     df = df.iloc[start_index:].reset_index(drop=True)
+
+#     print(f"Extracting hypotheses from {num_abstracts} abstracts starting from index {start_index}...")
+
+#     abstracts = df['abstract'].values
+#     extracted_bits = [None] * num_abstracts
+#     extracted_flips = [None] * num_abstracts
+#     titles = [None] * num_abstracts
+#     indices = [start_index + i for i in range(num_abstracts)]
+
+#     # Multithreaded processing
+#     with ThreadPoolExecutor(max_workers=5) as executor:
+#         for index, result in tqdm(executor.map(worker, enumerate(abstracts)), total=num_abstracts, desc="Extracting Hypotheses"):
+#             extracted_bits[index] = result['Bit'] if result else None
+#             extracted_flips[index] = result['Flip'] if result else None
+#             titles[index] = df['title'].values[index]
+
+#     # Create DataFrame
+#     df_extracted = pd.DataFrame({
+#         'index': indices,
+#         'bit': extracted_bits,
+#         'flip': extracted_flips,
+#         'title': titles
+#     }).dropna()
+
+
+#     # Change the saving location of the output CSV
+#     test_file_path = file_path.replace(".csv", "_test.csv")
+#     df_extracted.to_csv(test_file_path, index=False)
+
+#     print(f"Finished processing up to index {start_index + num_abstracts - 1}")
+
+# if __name__ == "__main__":
+#     # Run the main function directly without the loop and clear terminal command
+#     main()

@@ -27,14 +27,18 @@ embeddings = OpenAIEmbeddings(
     model="text-embedding-ada-002",
     openai_api_key=API_KEY,
     openai_api_type="azure",
-    chunk_size = 16,
+    chunk_size = 64,
 )
 
 # Load CSV file directly
 df = pd.read_csv('../data/processed/arxiv-cs.LG.csv', low_memory=False)
 
+# Get length of cs.LG.csv in ../data/tuning
+generated = pd.read_csv('../data/tuning/cs.LG.csv', low_memory=False)
+length = len(generated)
+
 # Create a list of strings by concatenating 'title' and 'abstract'
-documents = [f"{row['title']} {row['abstract']}" for index, row in df.head(3000).iterrows()]
+documents = [f"{row['title']} {row['abstract']}" for index, row in df.head(length).iterrows()]
 
 # Initialize an empty list to hold (text, embedding) tuples
 text_embeddings = []

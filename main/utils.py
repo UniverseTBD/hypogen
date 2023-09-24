@@ -69,4 +69,5 @@ def upload_dataset_to_hf(category: str):
     print(f"Dataset uploaded to HF hub: universeTBD/arxiv-bit-flip-{category}")
 
 if __name__ == '__main__':
-    load_arxiv_json_by_category(category='cs.LG')
+    load_arxiv_json_by_category(category='astro-ph')
+    #upload_dataset_to_hf(category='cs.LG')
