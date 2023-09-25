@@ -152,7 +152,7 @@ def diversity(synthetic_dataset, real_dataset, tokenizer) -> dict:
     return results
 
 if __name__ == "__main__":
-    method = "llama_three_shot"
+    method = "gpt_4_zero_shot"
     evaluator = TableEvaluation(method)
     results = evaluator.evaluate()
     print(f"Results for {method}:")

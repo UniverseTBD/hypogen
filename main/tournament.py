@@ -4,6 +4,7 @@ from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from tqdm import tqdm
 import logging
+from novelty import main as calculate_novelty
 import os
 
 # Create ../logs/tournament directory if it doesn't exist
@@ -29,7 +30,7 @@ llm = AzureChatOpenAI(
     openai_api_type="azure",
 )
 
-# New Prompt Template
+# New prompt template (modified to include novelty)
 tournament_template = """
 In this task, you are asked to utilise the Bit-Flip schema, a framework for evaluating scientific inquiries and their corresponding innovative solutions. The schema is based on two components:
 
@@ -42,18 +43,15 @@ Given a Bit:
 
 You are tasked with comparing two Flips, designated as Flip A and Flip B:
 
-* **Flip A**: {flip_a}
-* **Flip B**: {flip_b}
+* **Flip A**: {flip_a} (Novelty Score: {novelty_a})
+* **Flip B**: {flip_b} (Novelty Score: {novelty_b})
 
 Please evaluate these Flips based on the following criteria, scoring each on a scale from 0 to 5:
 
-1. **Novelty**: Does the Flip introduce a new idea or perspective?
-2. **Creativity**: How creatively does the Flip challenge the Bit?
-3. **Efficiency**: Is the Flip likely to be more efficient in achieving the intended outcome than the Bit?
-4. **Practicality**: How feasible is it to implement the Flip in real-world scenarios?
-5. **Elegance**: Does the Flip provide a more elegant or simpler solution than the Bit?
+1. **Creativity**: How creatively does the Flip challenge the Bit?
+2. **Practicality**: How feasible is it to implement the Flip in real-world scenarios?
 
-After evaluating, please calculate the average score for each Flip, rounding to two decimal places, to determine which Flip is superior.
+After evaluating, please calculate the average score for each Flip, rounding to two decimal places, to determine which Flip is superior. Do this by averaging over the scores for novelty (given), creativity and practicality. 
 Your final answer should be the flip with the highest score. If it's Flip A, your last output should be 'Flip A.' If it's Flip B, your last output should be 'Flip B.'
 """
 
@@ -65,9 +63,16 @@ tournament_chain = LLMChain(llm=llm, prompt=tournament_prompt, output_key="judge
 
 # Knockout Tournament Function
 def run_knockout_tournament(bit, flips):
-    remaining_flips = flips.copy()
     logging.info(f"Starting tournament for bit: {bit}")
     logging.info(f"Initial Flips: {flips}")
+
+    remaining_flips = flips.copy()
+    novelty_scores = {}  # To store the novelty scores
+
+    # Calculate novelty scores for each flip
+    for flip in remaining_flips:
+        bit_flip = {'bit': bit, 'flip': flip}
+        novelty_scores[flip] = calculate_novelty(bit_flip)
     
     while len(remaining_flips) > 1:
         next_round_flips = []
@@ -78,7 +83,13 @@ def run_knockout_tournament(bit, flips):
             if i + 1 < len(remaining_flips):  # Ensure there's a pair
                 flip_a = remaining_flips[i]
                 flip_b = remaining_flips[i+1]
-                result = tournament_chain({"bit": bit, "flip_a": flip_a, "flip_b": flip_b})
+                result = tournament_chain({
+                    "bit": bit,
+                    "flip_a": flip_a,
+                    "flip_b": flip_b,
+                    "novelty_a": novelty_scores[flip_a],
+                    "novelty_b": novelty_scores[flip_b]
+                })
                 judgement = result["judgement"]
                 
                 # Interpret judgement to choose winner
