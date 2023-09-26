@@ -190,7 +190,7 @@ def main(n):
     print(f"Finished processing up to index {start_index + num_abstracts - 1}")
 
 if __name__ == "__main__":
-    num_rounds = 500
+    num_rounds = 1500
     num_abstracts = 20  # Number of abstracts to process in each run
     for _ in tqdm(range(num_rounds), desc="Overall Progress"):
         main(num_abstracts)

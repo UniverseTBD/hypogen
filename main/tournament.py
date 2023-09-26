@@ -4,6 +4,10 @@ from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from tqdm import tqdm
 import logging
+import json
+import time
+from concurrent.futures import ThreadPoolExecutor
+import concurrent.futures
 from novelty import main as calculate_novelty
 import os
 
@@ -56,7 +60,10 @@ Your final answer should be the flip with the highest score. If it's Flip A, you
 """
 
 # Initialise PromptTemplate
-tournament_prompt = PromptTemplate(input_variables=["bit", "flip_a", "flip_b"], template=tournament_template)
+tournament_prompt = PromptTemplate(
+    input_variables=["bit", "flip_a", "flip_b", "novelty_a", "novelty_b"],  # Include novelty_a and novelty_b
+    template=tournament_template
+)
 
 # Initialise LLMChain
 tournament_chain = LLMChain(llm=llm, prompt=tournament_prompt, output_key="judgement")
@@ -77,31 +84,34 @@ def run_knockout_tournament(bit, flips):
     while len(remaining_flips) > 1:
         next_round_flips = []
         logging.info(f"New Round: Remaining Flips: {remaining_flips}")
-        
-        # Pairwise comparison of remaining flips
-        for i in range(0, len(remaining_flips), 2):
-            if i + 1 < len(remaining_flips):  # Ensure there's a pair
-                flip_a = remaining_flips[i]
-                flip_b = remaining_flips[i+1]
-                result = tournament_chain({
+
+        while len(remaining_flips) > 1:
+            next_round_flips = []
+            logging.info(f"New Round: Remaining Flips: {remaining_flips}")
+
+            # Pairwise comparison of remaining flips
+            with ThreadPoolExecutor() as executor:
+                future_results = {executor.submit(tournament_chain, {
                     "bit": bit,
-                    "flip_a": flip_a,
-                    "flip_b": flip_b,
-                    "novelty_a": novelty_scores[flip_a],
-                    "novelty_b": novelty_scores[flip_b]
-                })
-                judgement = result["judgement"]
+                    "flip_a": remaining_flips[i],
+                    "flip_b": remaining_flips[i+1],
+                    "novelty_a": novelty_scores[remaining_flips[i]],
+                    "novelty_b": novelty_scores[remaining_flips[i+1]]
+                }): (remaining_flips[i], remaining_flips[i+1]) for i in range(0, len(remaining_flips), 2) if i + 1 < len(remaining_flips)}
                 
-                # Interpret judgement to choose winner
-                winner = interpret_judgement(judgement, flip_a, flip_b)
-                logging.info(f"Match between Flip A: {flip_a} and Flip B: {flip_b}. Judgement: {judgement}. Winner: {winner}")
-                
-                next_round_flips.append(winner)
-            else:  # If an odd number, the last one automatically moves to the next round
-                logging.info(f"Unmatched Flip: {remaining_flips[i]} moves to the next round.")
-                next_round_flips.append(remaining_flips[i])
-                
-        remaining_flips = next_round_flips
+                for future in concurrent.futures.as_completed(future_results):
+                    flip_a, flip_b = future_results[future]
+                    try:
+                        result = future.result()
+                    except Exception as e:
+                        logging.info(f"Exception while comparing {flip_a} and {flip_b}: {e}")
+                        continue
+                    
+                    judgement = result["judgement"]
+                    winner = interpret_judgement(judgement, flip_a, flip_b)
+                    next_round_flips.append(winner)
+            
+            remaining_flips = next_round_flips
 
     logging.info(f"The winner of the tournament is: {remaining_flips[0]}")
     return remaining_flips[0]  # The last remaining flip is the winner
@@ -114,12 +124,20 @@ def interpret_judgement(judgement, flip_a, flip_b):
     if last_a > last_b: return flip_a
     else: return flip_b
 
-# Example usage
-bit = "Probabilistic principal component analysis (PPCA) seeks a low dimensional representation of a data set by solving an eigenvalue problem on the sample covariance matrix, assuming independent spherical Gaussian noise."
+if __name__ == "__main__":
+    # Example usage
+    
+    # Load a bit 
+    path = "../data/generated/proposal_hypogen.json"
+    with open(path, 'r') as f:
+        proposal_data = json.load(f)
 
-flips = ["Rather than solely utilizing PPCA for low-dimensional representation, employ a Multi-Layer Perceptron (MLP) as an autoencoder. This approach allows for the capturing of non-linear relationships in the data, enhancing the feature extraction process.", 
-         "Instead of PPCA, use Canonical Correlation Analysis (CCA) to find the directions that maximize the correlation between variables. This can be especially useful when the dataset involves multiple types of data, allowing for a richer representation.", 
-         "Forego PPCA in favor of t-Distributed Stochastic Neighbor Embedding (t-SNE) to find a low-dimensional representation. t-SNE excels in preserving local structure and can be particularly useful when clusters in high-dimensional space need to be accurately reflected in the low-dimensional mapping.", 
-         "Instead of solely relying on PPCA, the data variance can be further decomposed into its components through a generalised eigenvalue problem, called residual component analysis (RCA), which considers other factors like sparse conditional dependencies and temporal correlations that leave some residual variance."]
-winner = run_knockout_tournament(bit, flips)
-print(f"The winner is: {winner}")
+    bit = list(proposal_data.keys())[0]
+    flips = proposal_data[bit]
+
+    # Run the knockout tournament and time it
+    start = time.time()
+    winner = run_knockout_tournament(bit, flips)
+    print(f"The winner is: {winner}")
+    end = time.time()
+    print(f"Time taken: {end - start:.2f} seconds")
