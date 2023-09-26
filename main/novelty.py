@@ -47,7 +47,7 @@ def main(bit_flip):
     # Load Documents
     loader = CSVLoader(file_path='../data/processed/arxiv-cs.LG.csv', source_column="authors")
     documents = loader.load()
-    documents = documents[:50]
+    #documents = documents[:50]
 
     # Create Chroma Vectorstore
     vectordb = FAISS.load_local("../data/vectorstore/arxiv-cs.LG", embeddings)
