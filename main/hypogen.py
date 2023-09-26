@@ -1,64 +1,71 @@
-# Import required modules for hypogen.py
 import json
-import csv
-from tqdm import tqdm  # Import tqdm for progress bars
-from tournament import run_knockout_tournament  # Importing from the provided tournament.py script
-from critique import improve_hypothesis  # Importing from the provided critique.py script
+import pandas as pd
+from tqdm import tqdm
+from tournament import run_knockout_tournament
+from critique import improve_hypothesis
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor
 import os
-import time  # Import time module for timing
 
-# Create logging directory if it doesn't exist
-log_dir = "../logs/hypogen"
-os.makedirs(log_dir, exist_ok=True)
-
-# Configure logging
-logging.basicConfig(filename=f'{log_dir}/hypogen.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-def process_bit(bit, proposals, n_iters, writer):
-    logging.info(f"Processing bit: {bit}")
-
-    # Time tracking for tournament
-    start_time_tournament = time.time()
+def process_bit(bit, proposals, n_iters):
+    print(f"Processing bit: {bit}")
+    start = time.time()
     winner = run_knockout_tournament(bit, proposals)
-    end_time_tournament = time.time()
-    print(f"Time taken for knockout tournament for bit {bit}: {end_time_tournament - start_time_tournament:.2f} seconds")
-    
-    logging.info(f"The winner for bit {bit} is: {winner}")
-
-    # Time tracking for critique
-    start_time_critique = time.time()
+    end = time.time()
+    print(f"Time taken for tournament: {end - start:.2f} seconds")
     hypothesis_to_improve = {'Bit': bit, 'Flip': winner}
+    start = time.time()
     improved_hypothesis = improve_hypothesis(hypothesis=hypothesis_to_improve, n_iters=n_iters)
-    end_time_critique = time.time()
-    print(f"Time taken for critique and refinement for bit {bit}: {end_time_critique - start_time_critique:.2f} seconds")
+    end = time.time()
+    print(f"Time taken for improvement: {end - start:.2f} seconds")
+    return improved_hypothesis
 
-    logging.info(f"Final improved hypothesis: {improved_hypothesis}")
+def worker(bit_proposals_tuple):
+    try:
+        bit, proposals = bit_proposals_tuple
+        return process_bit(bit, proposals, n_iters=2)
+    except Exception as e:
+        logging.error(f"Error processing bit: {bit}. Error: {e}")
+        return None
 
-    # Save to CSV
-    writer.writerow(improved_hypothesis)
-
-def hypogen_main(json_file_path: str, csv_output_path: str, n_iters: int = 3):
+def hypogen_main(json_file_path, csv_output_path, n_iters=3):
     print("Loading proposal data...")
     with open(json_file_path, 'r') as f:
         proposal_data = json.load(f)
+
+    last_bit = None
+    if os.path.exists(csv_output_path):
+        df_existing = pd.read_csv(csv_output_path)
+        if not df_existing.empty:
+            last_bit = df_existing['Bit'].iloc[-1]
+            print(f"Last processed bit was: {last_bit}. Starting from the next bit.")
+
+    if last_bit:
+        all_bits = list(proposal_data.keys())
+        last_bit_index = all_bits.index(last_bit)
+        remaining_bits = all_bits[last_bit_index + 1:]
+        proposal_data = {bit: proposal_data[bit] for bit in remaining_bits}
+
+    results = []
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        for result in tqdm(executor.map(worker, proposal_data.items()), total=len(proposal_data)):
+            if result:
+                results.append(result)
+
+    df_results = pd.DataFrame(results)
     
-    print("Preparing CSV output...")
-    with open(csv_output_path, 'a', newline='') as csvfile:
-        fieldnames = ['Bit', 'Flip', 'Final']
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+    if os.path.exists(csv_output_path):
+        df_existing = pd.read_csv(csv_output_path)
+        df_results = pd.concat([df_existing, df_results], ignore_index=True)
 
-        if os.stat(csv_output_path).st_size == 0:
-            writer.writeheader()
-
-        print("Processing bits...")
-        for bit, proposals in tqdm(proposal_data.items()):
-            process_bit(bit, proposals, n_iters, writer)
+    df_results.to_csv(csv_output_path, index=False)
+    print("HypoGen main process completed.")
 
 if __name__ == "__main__":
     print("Starting HypoGen main process...")
     hypogen_main(
-        json_file_path="../data/generated/proposal_hypogen.json",  # Replace with your actual JSON path
-        csv_output_path="../data/generated/hypogen.csv"  # Replace with your desired CSV output path
+        json_file_path="../data/generated/proposal_hypogen.json",
+        csv_output_path="../data/generated/hypogen.csv"
     )
-    print("HypoGen main process completed.")

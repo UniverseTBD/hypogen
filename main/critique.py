@@ -6,6 +6,8 @@ from langchain.chat_models import AzureChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 import re
+import json
+import time
 from langchain.vectorstores import FAISS
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.chains import RetrievalQA  
@@ -66,11 +68,12 @@ And the following relevant papers:
 {context}
 
 Analyse each part of the hypothesis:
-1. Clarity: Are the statements clear and easy to understand?
+1. Clarity: Are the statements clear and specific? What is vague?
 2. Coherence: Do the different parts of the hypothesis logically flow together? Does it seem like the proposed solution would work?
 3. Scientific Validity: Are there any scientific inaccuracies or assumptions that seem unfounded?
 
-After your analysis, provide specific feedback on how the flip can be improved, either conceptually (changing the idea) or microscopically (changing the implementation). 
+After your analysis, provide specific feedback on how the flip can be improved, either conceptually (changing the idea) or microscopically (changing the implementation).
+Do not focus your critique on the proposed evaluation of the idea. Rather, focus on the mechanics of the idea itself. 
 Specifically, give feedback on the frailties of the idea as a whole, and suggest potential enhancements.
 """
 
@@ -80,11 +83,14 @@ You are tasked with revising an original hypothesis based on a critique. Here ar
 Original Hypothesis: {hypothesis}
 Critique: {critique}
 
-Your revised hypothesis should:
+Your revised hypothesis (representing an idea) should:
 - Be limited to three sentences, but don't number them. Don't make the sentences overly long.
+- The potential for the idea is the most important thing. Be creative and yet plausible in the specific idea.
+- Represent one holistic idea, not multiple scattered ideas or simply lists of methods. The idea should be integrated and coherent.
+- Focus on the implementation and mechanics of the idea, not how it will be evaluated. 
 - Address each point in the critique with a specific solution in the hypothesis. Don't just say "will be further explored" or acknowledge problems without providing solutions.
 - Be scientifically valid, clear, and coherent.
-- Maximize information density and conciseness of the three-sentence hypothesis.
+- Maximize information density and conciseness of the three-sentence hypothesis. Ensure the sentences are not overly long.
 - Prioritize scientific specifics and insight over generalities. Do not be trite or vague.
 - Be as feasible, accurate, and creative as the critique allows.
 
@@ -99,7 +105,10 @@ def retrieve_related_papers(hypothesis, vectordb, top_k=5):
 
 def adversarial_update_hypothesis(hypothesis):
     # Retrieve top 5 related papers
+    start = time.time()
     related_papers = retrieve_related_papers(hypothesis, vectordb)
+    end = time.time()
+    print(f"Time taken for retrieval: {end - start:.2f} seconds")
     # Format related papers into a string
     context_str = "\n".join([f"- {paper}" for paper in related_papers])
     # Prepare the input for the critic chain
@@ -136,9 +145,16 @@ def improve_hypothesis(hypothesis: dict, n_iters: int = 3) -> dict:
 
 if __name__ == "__main__":
 
+    path = "../data/generated/proposal_hypogen.json"
+    with open(path, 'r') as f:
+        proposal_data = json.load(f)
+
+    bit = list(proposal_data.keys())[500]
+    flips = proposal_data[bit]
+
     hypothesis_to_improve = {
-        'Bit': 'Statistical model estimation in sensor networks requires advanced and costly joint optimization methods for distributed learning.',
-        'Flip': 'Simple linear combination or max-voting methods, when combined with second-order information, can be statistically competitive, offering low communication and computational cost and "any-time" behavior.'
+        'Bit': bit,
+        'Flip': flips[0],
     }
 
     improved_hypothesis = improve_hypothesis(hypothesis=hypothesis_to_improve, n_iters=3)
