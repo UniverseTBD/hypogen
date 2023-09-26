@@ -29,28 +29,17 @@ def worker(bit_proposals_tuple):
         logging.error(f"Error processing bit: {bit}. Error: {e}")
         return None
 
-def hypogen_main(json_file_path, csv_output_path, n_iters=3):
+def hypogen_main(json_file_path, csv_output_path, n_bits, start_index=0):
     print("Loading proposal data...")
     with open(json_file_path, 'r') as f:
         proposal_data = json.load(f)
 
-    last_bit = None
-    if os.path.exists(csv_output_path):
-        df_existing = pd.read_csv(csv_output_path)
-        if not df_existing.empty:
-            last_bit = df_existing['Bit'].iloc[-1]
-            print(f"Last processed bit was: {last_bit}. Starting from the next bit.")
-
-    if last_bit:
-        all_bits = list(proposal_data.keys())
-        last_bit_index = all_bits.index(last_bit)
-        remaining_bits = all_bits[last_bit_index + 1:]
-        proposal_data = {bit: proposal_data[bit] for bit in remaining_bits}
+    all_bits = list(proposal_data.keys())[start_index:start_index + n_bits]
+    subset_proposal_data = {bit: proposal_data[bit] for bit in all_bits}
 
     results = []
-
     with ThreadPoolExecutor(max_workers=2) as executor:
-        for result in tqdm(executor.map(worker, proposal_data.items()), total=len(proposal_data)):
+        for result in tqdm(executor.map(worker, subset_proposal_data.items()), total=len(subset_proposal_data)):
             if result:
                 results.append(result)
 
@@ -61,11 +50,30 @@ def hypogen_main(json_file_path, csv_output_path, n_iters=3):
         df_results = pd.concat([df_existing, df_results], ignore_index=True)
 
     df_results.to_csv(csv_output_path, index=False)
-    print("HypoGen main process completed.")
+    print("Round completed.")
 
 if __name__ == "__main__":
-    print("Starting HypoGen main process...")
-    hypogen_main(
-        json_file_path="../data/generated/proposal_hypogen.json",
-        csv_output_path="../data/generated/hypogen.csv"
-    )
+    num_rounds = 490
+    num_bits = 2  # Number of bits to process in each run
+
+    # Determine the starting index
+    csv_output_path = "../data/generated/hypogen.csv"
+    start_index = 0
+    if os.path.exists(csv_output_path):
+        df_existing = pd.read_csv(csv_output_path)
+        if not df_existing.empty:
+            last_bit = df_existing['Bit'].iloc[-1]
+            with open("../data/generated/proposal_hypogen.json", 'r') as f:
+                all_bits = list(json.load(f).keys())
+            start_index = all_bits.index(last_bit) + 1
+
+    for _ in tqdm(range(num_rounds), desc="Overall Progress"):
+        hypogen_main(
+            json_file_path="../data/generated/proposal_hypogen.json",
+            csv_output_path=csv_output_path,
+            n_bits=num_bits,
+            start_index=start_index
+        )
+        start_index += num_bits
+        # Clear terminal
+        os.system('cls' if os.name == 'nt' else 'clear')
